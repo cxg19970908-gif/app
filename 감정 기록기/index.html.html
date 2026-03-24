@@ -1,0 +1,231 @@
+index.html
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오늘의 마음 - 감정 다이어리</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (Noto Sans KR) -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+        /* 노란색/오렌지 계열 그라데이션 배경 */
+        .bg-main {
+            background: linear-gradient(135deg, #fef3c7 0%, #fcd34d 100%);
+        }
+        /* 감정 버튼 클릭 애니메이션 */
+        .emoji-btn:active {
+            transform: scale(0.9);
+        }
+        .emoji-btn.selected {
+            border-color: #f59e0b;
+            background-color: #fffbeb;
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
+        }
+        /* 기록 리스트 애니메이션 */
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* 커스텀 스크롤바 */
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background-color: #fbbf24;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="bg-main min-h-screen flex items-center justify-center p-4">
+
+    <!-- 중앙 카드 UI -->
+    <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col h-[90vh]">
+        
+        <!-- 상단 입력 영역 -->
+        <div class="p-8 pb-4">
+            <header class="mb-6 text-center">
+                <h1 class="text-2xl font-bold text-gray-800 tracking-tight">마음 기록 시스템 ✨</h1>
+                <p class="text-gray-400 text-sm mt-1">지금 이 순간의 기분은?</p>
+            </header>
+
+            <!-- 감정 선택 버튼 (빠른 기록 지원) -->
+            <div class="grid grid-cols-5 gap-2 mb-6" id="emojiGroup">
+                <button onclick="handleEmojiClick(this, '😊', '행복')" class="emoji-btn flex flex-col items-center p-3 border-2 border-transparent rounded-2xl transition-all hover:bg-yellow-50">
+                    <span class="text-3xl">😊</span>
+                    <span class="text-[10px] mt-1 font-bold text-gray-500">행복</span>
+                </button>
+                <button onclick="handleEmojiClick(this, '😢', '슬픔')" class="emoji-btn flex flex-col items-center p-3 border-2 border-transparent rounded-2xl transition-all hover:bg-yellow-50">
+                    <span class="text-3xl">😢</span>
+                    <span class="text-[10px] mt-1 font-bold text-gray-500">슬픔</span>
+                </button>
+                <button onclick="handleEmojiClick(this, '😡', '화남')" class="emoji-btn flex flex-col items-center p-3 border-2 border-transparent rounded-2xl transition-all hover:bg-yellow-50">
+                    <span class="text-3xl">😡</span>
+                    <span class="text-[10px] mt-1 font-bold text-gray-500">화남</span>
+                </button>
+                <button onclick="handleEmojiClick(this, '😴', '피곤')" class="emoji-btn flex flex-col items-center p-3 border-2 border-transparent rounded-2xl transition-all hover:bg-yellow-50">
+                    <span class="text-3xl">😴</span>
+                    <span class="text-[10px] mt-1 font-bold text-gray-500">피곤</span>
+                </button>
+                <button onclick="handleEmojiClick(this, '😍', '설렘')" class="emoji-btn flex flex-col items-center p-3 border-2 border-transparent rounded-2xl transition-all hover:bg-yellow-50">
+                    <span class="text-3xl">😍</span>
+                    <span class="text-[10px] mt-1 font-bold text-gray-500">설렘</span>
+                </button>
+            </div>
+
+            <!-- 텍스트 입력창 -->
+            <div class="relative mb-4">
+                <input type="text" id="memoInput" placeholder="한 줄 메시지 남기기 (선택)" 
+                    class="w-full bg-gray-50 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-yellow-400 transition-all outline-none">
+            </div>
+
+            <!-- 상세 저장 버튼 -->
+            <button onclick="saveDetailRecord()" class="w-full bg-yellow-400 hover:bg-yellow-500 text-white font-bold py-4 rounded-2xl shadow-lg shadow-yellow-100 transition-all active:scale-95">
+                내용과 함께 저장하기
+            </button>
+        </div>
+
+        <!-- 하단 리스트 영역 -->
+        <div class="flex-1 overflow-hidden flex flex-col bg-gray-50 rounded-t-[2.5rem]">
+            <div class="px-8 pt-6 pb-2">
+                <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest">최근 기록 목록</h2>
+            </div>
+            <div id="recordList" class="flex-1 overflow-y-auto px-6 py-2 custom-scroll space-y-3">
+                <!-- 리스트 아이템 동적 삽입 -->
+                <div class="text-center py-20 text-gray-300 text-sm">기록을 불러오는 중...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK 모듈 -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc } 
+        from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+        // Firebase 설정 (본인의 값으로 교체하세요)
+        const firebaseConfig = {
+           apiKey: "AIzaSyBCt4myBJk3qjSiIDdFm24aAukZmnI9j-0",
+  authDomain: "project-99207794435229328.firebaseapp.com",
+  projectId: "project-99207794435229328",
+  storageBucket: "project-99207794435229328.firebasestorage.app",
+  messagingSenderId: "486867989118",
+  appId: "1:486867989118:web:5d6a1bdc2f85b838a21e2f"
+};
+
+        // Firebase 초기화
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const colRef = collection(db, "daily_emotions");
+
+        let selectedEmotion = null;
+
+        // 시간 포맷팅 함수 (3월 24일 14:30)
+        function getFormattedTime() {
+            const now = new Date();
+            const month = now.getMonth() + 1;
+            const date = now.getDate();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            return `${month}월 ${date}일 ${hours}:${minutes}`;
+        }
+
+        // 공통 저장 함수
+        async function pushToFirebase(emoji, label, memo = "") {
+            try {
+                await addDoc(colRef, {
+                    emoji: emoji,
+                    label: label,
+                    memo: memo,
+                    timestamp: getFormattedTime(),
+                    createdAt: serverTimestamp() // 정렬용 서버 시간
+                });
+            } catch (err) {
+                console.error("저장 실패:", err);
+            }
+        }
+
+        // 1. 감정 버튼 클릭 (빠른 기록)
+        window.handleEmojiClick = (btn, emoji, label) => {
+            // UI 선택 상태 표시
+            document.querySelectorAll('.emoji-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            selectedEmotion = { emoji, label };
+
+            // 빠른 기록 기능: 텍스트가 없을 때 버튼 클릭만으로 즉시 저장
+            const memoValue = document.getElementById('memoInput').value.trim();
+            if(!memoValue) {
+                pushToFirebase(emoji, label);
+            }
+        };
+
+        // 2. 저장 버튼 클릭 (상세 기록)
+        window.saveDetailRecord = () => {
+            const memoInput = document.getElementById('memoInput');
+            const memoValue = memoInput.value.trim();
+
+            if (!selectedEmotion) {
+                alert("먼저 감정 이모지를 선택해주세요!");
+                return;
+            }
+
+            pushToFirebase(selectedEmotion.emoji, selectedEmotion.label, memoValue);
+            
+            // 입력창 초기화
+            memoInput.value = "";
+            document.querySelectorAll('.emoji-btn').forEach(b => b.classList.remove('selected'));
+            selectedEmotion = null;
+        };
+
+        // 3. 기록 삭제
+        window.deleteRecord = async (id) => {
+            if(confirm("이 기록을 삭제하시겠습니까?")) {
+                await deleteDoc(doc(db, "daily_emotions", id));
+            }
+        };
+
+        // 4. 실시간 리스너 (onSnapshot)
+        const q = query(colRef, orderBy("createdAt", "desc"));
+        onSnapshot(q, (snapshot) => {
+            const recordList = document.getElementById('recordList');
+            recordList.innerHTML = "";
+
+            if (snapshot.empty) {
+                recordList.innerHTML = `<div class="text-center py-20 text-gray-300 text-sm">아직 기록이 없습니다.</div>`;
+                return;
+            }
+
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                const id = doc.id;
+                
+                const item = document.createElement('div');
+                item.className = "fade-in bg-white p-4 rounded-3xl flex items-center shadow-sm border border-gray-100";
+                item.innerHTML = `
+                    <div class="text-3xl mr-4">${data.emoji}</div>
+                    <div class="flex-1">
+                        <div class="flex items-center">
+                            <span class="text-xs font-bold text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full mr-2">${data.label}</span>
+                            <span class="text-[10px] text-gray-400">${data.timestamp}</span>
+                        </div>
+                        ${data.memo ? `<p class="text-sm text-gray-700 mt-1 font-medium">${data.memo}</p>` : ''}
+                    </div>
+                    <button onclick="deleteRecord('${id}')" class="text-gray-300 hover:text-red-400 transition-colors p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                `;
+                recordList.appendChild(item);
+            });
+        });
+    </script>
+</body>
+</html>
